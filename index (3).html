@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>LCP Array Construction from Suffix Arrays</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700;800&family=Instrument+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="#top">SA<b>+</b>LCP</a>
+    <ul>
+      <li><a class="l" href="#try">Try it</a></li>
+      <li><a class="l" href="#kasai">Kasai's algorithm</a></li>
+      <li><a class="l" href="#queries">Queries</a></li>
+      <li><a class="l" href="#bench">Benchmarks</a></li>
+      <li><a class="l" href="#background">Background</a></li>
+      <li><a class="l" href="#team">Team</a></li>
+    </ul>
+  </div>
+</header>
+
+<main id="top">
+
+<section class="hero" id="try">
+  <div class="wrap">
+    <h1>Longest common prefix arrays, built from suffix arrays</h1>
+    <p class="lead" style="margin-top:20px">Sort every suffix of a string and you get a suffix array. Record how many leading characters each suffix shares with the one before it and you get the LCP array. Type a word below and watch both appear.</p>
+
+    <div class="heroin">
+      <div class="field">
+        <label for="txt">Your text (up to 24 characters)</label>
+        <input id="txt" type="text" value="banana" maxlength="24" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="legend">Suffixes are listed in sorted order. <mark class="m">Highlighted</mark> characters are the prefix shared with the row above, and their count is the LCP value.</div>
+    </div>
+
+    <div class="tablewrap"><table class="sa" id="satable" aria-live="polite"></table></div>
+    <div class="arrays" id="arrays"></div>
+    <div class="cmp" id="cmpbox"></div>
+  </div>
+</section>
+
+<section id="kasai">
+  <div class="wrap">
+    <h2>How Kasai's algorithm skips the repeated work</h2>
+    <p>The naive method compares each pair of neighbouring suffixes from the first character. Kasai's method visits suffixes in text order instead. If suffix <b>i</b> shares <b>h</b> characters with its predecessor, then suffix <b>i+1</b> shares at least <b>h−1</b> with its own. So <b>h</b> only ever drops by one per step, and the total number of comparisons stays under 2n.</p>
+    <p class="note">This walks through the text you typed above.</p>
+
+    <div class="stepgrid">
+      <div class="stepbox">
+        <h3>Current step</h3>
+        <div class="pair" id="pair"></div>
+        <div class="stepmsg" id="stepmsg"></div>
+        <div class="ctrls">
+          <button id="bBack">Back</button>
+          <button id="bNext" class="primary">Next step</button>
+          <button id="bPlay">Play</button>
+          <button id="bReset">Reset</button>
+          <span class="pos" id="steppos"></span>
+        </div>
+      </div>
+      <div>
+        <h3>Array being filled</h3>
+        <div class="cellslabel">Suffix array SA[k]</div>
+        <div class="cells" id="cellsSA"></div>
+        <div class="cellslabel">LCP[k], blank until computed</div>
+        <div class="cells" id="cellsLCP"></div>
+        <div class="cellslabel" style="margin-top:22px">Comparisons so far</div>
+        <div class="mono" style="font-size:22px" id="stepcmp"></div>
+        <p class="note" style="margin-top:8px">Grey characters were skipped because the previous step had already proved they match.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="queries">
+  <div class="wrap">
+    <h2>Four substring questions, answered from the two arrays</h2>
+    <p>Once the suffix array and LCP array exist, none of these queries needs to scan the text again.</p>
+
+    <div class="qin">
+      <div class="field"><label for="qt">Text</label><input id="qt" type="text" value="mississippi" maxlength="60" autocomplete="off" spellcheck="false"></div>
+      <div class="field"><label for="qp">Pattern to search</label><input id="qp" type="text" value="ssi" maxlength="20" autocomplete="off" spellcheck="false"></div>
+      <div class="field"><label for="q2">Second text, for longest common substring</label><input id="q2" type="text" value="missouri" maxlength="60" autocomplete="off" spellcheck="false"></div>
+    </div>
+
+    <div class="qrows">
+      <div class="qrow"><div><h3>Pattern search</h3><div class="how">Binary search the sorted suffixes. Every match sits in one contiguous block of the suffix array.</div></div><div class="qres" id="r1"></div></div>
+      <div class="qrow"><div><h3>Longest repeated substring</h3><div class="how">The largest LCP value is the longest prefix shared by two different suffixes.</div></div><div class="qres" id="r2"></div></div>
+      <div class="qrow"><div><h3>Distinct substrings</h3><div class="how">Total substrings n(n+1)/2, minus the sum of the LCP array, which counts the duplicates.</div></div><div class="qres" id="r3"></div></div>
+      <div class="qrow"><div><h3>Longest common substring</h3><div class="how">Join both texts with a separator, then take the largest LCP between neighbours that come from different texts.</div></div><div class="qres" id="r4"></div></div>
+    </div>
+  </div>
+</section>
+
+<section id="bench">
+  <div class="wrap">
+    <h2>Benchmarks: naive vs Kasai</h2>
+    <p>Both methods produce identical LCP arrays on every run. They differ in time. On random 4-letter text Kasai is a steady 2 to 3 times faster. On a string of one repeated letter, the naive method slows quadratically and Kasai does not, reaching <b>786 times faster at n = 3200</b>.</p>
+
+    <div class="tabs" role="group" aria-label="Input type">
+      <button id="tabR" aria-pressed="false">Random text</button>
+      <button id="tabW" aria-pressed="true">Worst case: "a" repeated</button>
+    </div>
+    <div class="chartbox"><svg class="chart" id="chart" viewBox="0 0 720 320" role="img" aria-label="Line chart of LCP construction time against input length"></svg></div>
+    <div class="tablewrap"><table class="btable" id="btable"></table></div>
+    <p class="note" style="margin-top:12px">Reported results from the Python implementation, times in seconds.</p>
+
+    <div class="live">
+      <h3>Run it on your own device</h3>
+      <p>The same two algorithms, written in JavaScript, timed in your browser right now. Your numbers will differ from the Python results above, but the gap should look familiar.</p>
+      <button class="primary" id="runLive">Run benchmark</button>
+      <div class="tablewrap"><table class="btable" id="livetable" style="display:none"></table></div>
+    </div>
+  </div>
+</section>
+
+<section id="background">
+  <div class="wrap">
+    <h2>Background and goals</h2>
+    <p>Computing the LCP array by brute force takes O(n²) time in the worst case, which is impractical for the large texts used in compression and analytics pipelines. This project builds the suffix array, implements the naive method as a correctness baseline, implements Kasai's linear-time method, and checks that the two agree.</p>
+
+    <h3 style="margin-top:34px">Research this builds on</h3>
+    <ul class="tl">
+      <li><span class="yr">1993</span><p><b>Manber and Myers</b> introduced the suffix array as a space-efficient alternative to suffix trees, buildable in O(n log n).</p></li>
+      <li><span class="yr">1994</span><p><b>Burrows and Wheeler</b> described a reversible text transform on sorted rotations, equivalent to a suffix array and the basis of bzip2-style compressors.</p></li>
+      <li><span class="yr">2000</span><p><b>Ferragina and Manzini</b> combined the BWT with suffix arrays to build FM-indexes for compressed full-text search.</p></li>
+      <li><span class="yr">2001</span><p><b>Kasai, Lee, Arimura, Arikawa and Park</b> proposed the linear-time LCP algorithm used here, based on the fact that the match length drops by at most one per step.</p></li>
+      <li><span class="yr">2003</span><p><b>Kärkkäinen and Sanders</b> presented the DC3 (skew) algorithm, building suffix arrays in O(n) time for very large texts.</p></li>
+    </ul>
+
+    <div class="two">
+      <div>
+        <h3>What was built</h3>
+        <ul>
+          <li>Suffix array construction</li>
+          <li>Naive O(n²) LCP algorithm as the baseline</li>
+          <li>Kasai's O(n) LCP algorithm, verified against the baseline</li>
+          <li>Pattern search, longest repeated substring, distinct-substring count, longest common substring</li>
+          <li>Benchmarks on random and worst-case text</li>
+        </ul>
+      </div>
+      <div>
+        <h3>What it needs to run</h3>
+        <ul>
+          <li>Any PC or laptop with a dual-core processor and 4 GB RAM (8 GB for larger benchmarks)</li>
+          <li>No GPU, since everything runs on the CPU</li>
+          <li>Python 3.10 or later, standard library only</li>
+          <li>Optional: matplotlib for benchmark charts</li>
+          <li>Windows, Linux or macOS</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3 style="margin-top:44px">Conclusion</h3>
+    <p>Kasai's algorithm computes the LCP array in O(n) and matched the O(n²) method on every test. It was up to about 786 times faster on repetitive worst-case text and 2 to 3 times faster on random text. Together the two arrays answer substring queries efficiently with modest memory, which is why they sit underneath BWT-based compressors, duplicate-content detection and genome alignment tools.</p>
+
+    <h3 style="margin-top:34px">Future scope</h3>
+    <ul style="padding-left:20px;max-width:68ch;margin:0">
+      <li style="margin-bottom:8px">Replace suffix array construction with the O(n) DC3/skew algorithm for genomic and web-scale texts.</li>
+      <li style="margin-bottom:8px">Add a suffix-tree emulation layer, such as LCP-interval trees, for richer structural queries.</li>
+      <li style="margin-bottom:8px">Use the toolkit inside a real Burrows-Wheeler compressor and measure compression ratio and speed.</li>
+      <li>Parallelise LCP construction and pattern search for multi-core or distributed processing.</li>
+    </ul>
+  </div>
+</section>
+
+<section id="team">
+  <div class="wrap">
+    <h2>Team</h2>
+    <p>Data Structures and Algorithms-3 (25CS2103E), A.Y. 2026-2027, KL University, Hyderabad.</p>
+    <div class="team">
+      <div><span>2520030596</span>Shivasai</div>
+      <div><span>2520030526</span>Tarun V</div>
+      <div><span>2520030513</span>K. Rohan</div>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">Project report submitted for partial fulfilment of grade in Data Structures and Algorithms-3 (25CS2103E).</div>
+</footer>
+
+<script src="script.js"></script>
+</body>
+</html>

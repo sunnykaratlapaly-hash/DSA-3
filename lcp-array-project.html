@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>LCP Array Construction from Suffix Arrays</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700;800&family=Instrument+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F6F6F4; --surface:#FFFFFF; --ink:#1C1C21; --muted:#5C606B; --line:#DAD9D4;
+  --accent:#B0142B; --accent-soft:#F8E3E6; --deep:#6B0A1B; --skip:#E9E8E3; --good:#1F7A4D;
+  --display:"Bricolage Grotesque","Helvetica Neue",Arial,sans-serif;
+  --body:"Instrument Sans","Helvetica Neue",Arial,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#141317; --surface:#1D1B21; --ink:#ECEAE6; --muted:#A19FA8; --line:#36333C;
+    --accent:#FF6B7D; --accent-soft:#3A1A20; --deep:#FF9AA8; --skip:#2A2830; --good:#5BD19A;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#141317; --surface:#1D1B21; --ink:#ECEAE6; --muted:#A19FA8; --line:#36333C;
+  --accent:#FF6B7D; --accent-soft:#3A1A20; --deep:#FF9AA8; --skip:#2A2830; --good:#5BD19A;
+}
+html{scroll-padding-top:calc(env(safe-area-inset-top,0px) + 64px);scroll-behavior:smooth}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.6}
+a{color:var(--accent)}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.wrap{max-width:1040px;margin:0 auto;padding:0 24px}
+.mono{font-family:var(--mono)}
+
+/* nav */
+header.nav{position:sticky;top:env(safe-area-inset-top,0px);z-index:10;background:var(--bg);border-bottom:1px solid var(--line)}
+.nav .wrap{display:flex;align-items:center;gap:28px;height:56px}
+.brand{font-family:var(--mono);font-weight:500;font-size:15px;color:var(--ink);text-decoration:none;white-space:nowrap}
+.brand b{color:var(--accent);font-weight:500}
+.nav ul{display:flex;gap:20px;list-style:none;margin:0 0 0 auto;padding:0;overflow-x:auto;scrollbar-width:none}
+.nav a.l{color:var(--muted);text-decoration:none;font-size:15px;white-space:nowrap}
+.nav a.l:hover{color:var(--ink)}
+
+/* type */
+h1,h2,h3{font-family:var(--display);line-height:1.08;margin:0;letter-spacing:-.02em}
+h1{font-size:clamp(38px,6.4vw,68px);font-weight:800;max-width:15em}
+h2{font-size:clamp(28px,4vw,40px);font-weight:700;margin-bottom:14px}
+h3{font-size:20px;font-weight:700;letter-spacing:-.01em;margin-bottom:6px}
+p{margin:0 0 14px;max-width:68ch}
+.lead{font-size:19px;color:var(--muted);max-width:60ch}
+section{padding:72px 0;border-top:1px solid var(--line)}
+section.hero{border-top:0;padding-top:56px}
+
+/* controls */
+.field{display:flex;flex-direction:column;gap:6px}
+.field label{font-size:14px;color:var(--muted);font-weight:500}
+input[type=text]{font-family:var(--mono);font-size:18px;padding:10px 14px;border:1.5px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);width:100%}
+input[type=text]:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 3px var(--accent-soft)}
+button{font-family:var(--body);font-size:15px;font-weight:600;padding:9px 16px;border-radius:6px;border:1.5px solid var(--ink);background:var(--surface);color:var(--ink);cursor:pointer}
+button:hover:not(:disabled){background:var(--ink);color:var(--bg)}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button.primary:hover:not(:disabled){background:var(--deep);border-color:var(--deep);color:#fff}
+button:disabled{opacity:.4;cursor:default}
+
+/* hero table */
+.heroin{display:grid;grid-template-columns:minmax(0,340px) 1fr;gap:24px;align-items:end;margin:36px 0 22px}
+.legend{font-size:14px;color:var(--muted);padding-bottom:10px}
+.legend mark{padding:1px 6px}
+mark.m{background:var(--accent-soft);color:var(--accent);border-radius:3px;font-weight:500}
+.sa{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--line);font-family:var(--mono);font-size:17px}
+.sa th{font-family:var(--body);font-size:13px;font-weight:600;color:var(--muted);text-align:left;padding:10px 14px;border-bottom:1.5px solid var(--ink)}
+.sa td{padding:7px 14px;border-bottom:1px solid var(--line)}
+.sa tr:last-child td{border-bottom:0}
+.sa td.n{color:var(--muted);width:1%;text-align:right}
+.sa td.v{width:1%;font-weight:500}
+.sa td.lcpv{width:1%;color:var(--accent);font-weight:500}
+.sa td.suf{white-space:pre;overflow-wrap:normal}
+.tablewrap{overflow-x:auto}
+.arrays{margin-top:18px;display:grid;gap:6px;font-family:var(--mono);font-size:15px}
+.arrays div{overflow-x:auto;white-space:nowrap}
+.arrays span.k{color:var(--muted);display:inline-block;width:5.2em}
+.cmp{margin-top:18px;padding:14px 18px;border-left:4px solid var(--accent);background:var(--surface)}
+.cmp p{margin:0}
+
+/* kasai stepper */
+.stepgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:40px;margin-top:28px}
+.stepbox{background:var(--surface);border:1px solid var(--line);padding:22px;border-radius:8px}
+.pair{font-family:var(--mono);font-size:19px;margin:14px 0}
+.pair .row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.pair .tag{font-family:var(--body);font-size:13px;color:var(--muted);width:92px;flex:none}
+.pair .chars{display:flex;flex-wrap:wrap}
+.ch{width:1.55em;height:1.9em;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line);margin-right:-1px}
+.ch.skip{background:var(--skip);color:var(--muted)}
+.ch.hit{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
+.ch.miss{border:2px dashed var(--ink)}
+.stepmsg{min-height:5.2em;font-size:16px}
+.ctrls{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;align-items:center}
+.ctrls .pos{margin-left:auto;font-size:14px;color:var(--muted);font-family:var(--mono)}
+.cells{display:flex;overflow-x:auto;font-family:var(--mono);margin-top:10px;padding-bottom:6px}
+.cell{flex:none;min-width:2.6em;text-align:center;border:1px solid var(--line);margin-right:-1px;background:var(--surface)}
+.cell .i{font-size:12px;color:var(--muted);border-bottom:1px solid var(--line);padding:2px 0}
+.cell .x{padding:6px 4px;font-size:17px}
+.cell.cur{border-color:var(--accent);background:var(--accent-soft);position:relative;z-index:1}
+.cell.cur .x{color:var(--accent);font-weight:500}
+.cell .x.empty{color:var(--muted)}
+.cellslabel{font-size:14px;color:var(--muted);margin-top:14px;font-weight:500}
+
+/* queries */
+.qin{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;margin:26px 0 8px}
+.qrows{border-top:1.5px solid var(--ink)}
+.qrow{display:grid;grid-template-columns:230px minmax(0,1fr);gap:28px;padding:20px 0;border-bottom:1px solid var(--line)}
+.qrow h3{margin-bottom:4px}
+.qrow .how{font-size:14.5px;color:var(--muted);line-height:1.45}
+.qres{font-size:16px}
+.qres .big{font-family:var(--mono);font-size:20px;font-weight:500;color:var(--accent)}
+.hltext{font-family:var(--mono);font-size:18px;word-break:break-all;margin-top:6px}
+.hltext mark{background:var(--accent-soft);color:var(--accent);outline:1px solid var(--accent);border-radius:2px}
+.none{color:var(--muted)}
+
+/* bench */
+.tabs{display:flex;gap:0;margin:22px 0 18px;border:1.5px solid var(--ink);width:max-content;max-width:100%;border-radius:6px;overflow:hidden}
+.tabs button{border:0;border-radius:0;background:var(--surface)}
+.tabs button[aria-pressed=true]{background:var(--ink);color:var(--bg)}
+.chartbox{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px 8px}
+svg.chart{width:100%;height:auto;display:block}
+svg.chart text{font-family:var(--body);fill:var(--muted);font-size:12px}
+svg.chart .gl{stroke:var(--line);stroke-width:1}
+svg.chart .ax{stroke:var(--ink);stroke-width:1.2}
+svg.chart .lab-n{fill:var(--accent);font-weight:600;font-size:13px}
+svg.chart .lab-k{fill:var(--ink);font-weight:600;font-size:13px}
+.btable{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:15px;margin-top:18px}
+.btable th{font-family:var(--body);font-size:13px;color:var(--muted);text-align:right;font-weight:600;padding:8px 10px;border-bottom:1.5px solid var(--ink)}
+.btable td{text-align:right;padding:8px 10px;border-bottom:1px solid var(--line)}
+.btable th:first-child,.btable td:first-child{text-align:left}
+.btable td.sp{color:var(--accent);font-weight:500}
+.note{font-size:15px;color:var(--muted)}
+.live{margin-top:40px;padding-top:28px;border-top:1px dashed var(--line)}
+
+/* background */
+.tl{list-style:none;margin:26px 0 0;padding:0;border-left:2px solid var(--ink)}
+.tl li{position:relative;padding:0 0 22px 24px;display:grid;grid-template-columns:70px 1fr;gap:12px}
+.tl li::before{content:"";position:absolute;left:-7px;top:8px;width:12px;height:12px;background:var(--accent);border-radius:50%}
+.tl .yr{font-family:var(--mono);font-weight:500;color:var(--accent)}
+.tl p{margin:0}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:48px;margin-top:20px}
+.two ul{margin:0;padding-left:20px}
+.two li{margin-bottom:8px}
+.team{display:flex;flex-wrap:wrap;gap:12px 40px;margin-top:20px;font-family:var(--mono);font-size:16px}
+.team div span{display:block;color:var(--muted);font-size:13px;font-family:var(--body)}
+footer{padding:36px 0 56px;border-top:1px solid var(--line);color:var(--muted);font-size:14.5px}
+
+@media (max-width:760px){
+  .heroin,.stepgrid,.two,.qin{grid-template-columns:1fr}
+  .qrow{grid-template-columns:1fr;gap:8px}
+  .tl li{grid-template-columns:1fr;gap:0}
+  section{padding:52px 0}
+  .nav .wrap{gap:14px}
+  .stepgrid{gap:28px}
+}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="#top">SA<b>+</b>LCP</a>
+    <ul>
+      <li><a class="l" href="#try">Try it</a></li>
+      <li><a class="l" href="#kasai">Kasai's algorithm</a></li>
+      <li><a class="l" href="#queries">Queries</a></li>
+      <li><a class="l" href="#bench">Benchmarks</a></li>
+      <li><a class="l" href="#background">Background</a></li>
+      <li><a class="l" href="#team">Team</a></li>
+    </ul>
+  </div>
+</header>
+
+<main id="top">
+
+<section class="hero" id="try">
+  <div class="wrap">
+    <h1>Longest common prefix arrays, built from suffix arrays</h1>
+    <p class="lead" style="margin-top:20px">Sort every suffix of a string and you get a suffix array. Record how many leading characters each suffix shares with the one before it and you get the LCP array. Type a word below and watch both appear.</p>
+
+    <div class="heroin">
+      <div class="field">
+        <label for="txt">Your text (up to 24 characters)</label>
+        <input id="txt" type="text" value="banana" maxlength="24" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="legend">Suffixes are listed in sorted order. <mark class="m">Highlighted</mark> characters are the prefix shared with the row above, and their count is the LCP value.</div>
+    </div>
+
+    <div class="tablewrap"><table class="sa" id="satable" aria-live="polite"></table></div>
+    <div class="arrays" id="arrays"></div>
+    <div class="cmp" id="cmpbox"></div>
+  </div>
+</section>
+
+<section id="kasai">
+  <div class="wrap">
+    <h2>How Kasai's algorithm skips the repeated work</h2>
+    <p>The naive method compares each pair of neighbouring suffixes from the first character. Kasai's method visits suffixes in text order instead. If suffix <b>i</b> shares <b>h</b> characters with its predecessor, then suffix <b>i+1</b> shares at least <b>h−1</b> with its own. So <b>h</b> only ever drops by one per step, and the total number of comparisons stays under 2n.</p>
+    <p class="note">This walks through the text you typed above.</p>
+
+    <div class="stepgrid">
+      <div class="stepbox">
+        <h3>Current step</h3>
+        <div class="pair" id="pair"></div>
+        <div class="stepmsg" id="stepmsg"></div>
+        <div class="ctrls">
+          <button id="bBack">Back</button>
+          <button id="bNext" class="primary">Next step</button>
+          <button id="bPlay">Play</button>
+          <button id="bReset">Reset</button>
+          <span class="pos" id="steppos"></span>
+        </div>
+      </div>
+      <div>
+        <h3>Array being filled</h3>
+        <div class="cellslabel">Suffix array SA[k]</div>
+        <div class="cells" id="cellsSA"></div>
+        <div class="cellslabel">LCP[k], blank until computed</div>
+        <div class="cells" id="cellsLCP"></div>
+        <div class="cellslabel" style="margin-top:22px">Comparisons so far</div>
+        <div class="mono" style="font-size:22px" id="stepcmp"></div>
+        <p class="note" style="margin-top:8px">Grey characters were skipped because the previous step had already proved they match.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="queries">
+  <div class="wrap">
+    <h2>Four substring questions, answered from the two arrays</h2>
+    <p>Once the suffix array and LCP array exist, none of these queries needs to scan the text again.</p>
+
+    <div class="qin">
+      <div class="field"><label for="qt">Text</label><input id="qt" type="text" value="mississippi" maxlength="60" autocomplete="off" spellcheck="false"></div>
+      <div class="field"><label for="qp">Pattern to search</label><input id="qp" type="text" value="ssi" maxlength="20" autocomplete="off" spellcheck="false"></div>
+      <div class="field"><label for="q2">Second text, for longest common substring</label><input id="q2" type="text" value="missouri" maxlength="60" autocomplete="off" spellcheck="false"></div>
+    </div>
+
+    <div class="qrows">
+      <div class="qrow"><div><h3>Pattern search</h3><div class="how">Binary search the sorted suffixes. Every match sits in one contiguous block of the suffix array.</div></div><div class="qres" id="r1"></div></div>
+      <div class="qrow"><div><h3>Longest repeated substring</h3><div class="how">The largest LCP value is the longest prefix shared by two different suffixes.</div></div><div class="qres" id="r2"></div></div>
+      <div class="qrow"><div><h3>Distinct substrings</h3><div class="how">Total substrings n(n+1)/2, minus the sum of the LCP array, which counts the duplicates.</div></div><div class="qres" id="r3"></div></div>
+      <div class="qrow"><div><h3>Longest common substring</h3><div class="how">Join both texts with a separator, then take the largest LCP between neighbours that come from different texts.</div></div><div class="qres" id="r4"></div></div>
+    </div>
+  </div>
+</section>
+
+<section id="bench">
+  <div class="wrap">
+    <h2>Benchmarks: naive vs Kasai</h2>
+    <p>Both methods produce identical LCP arrays on every run. They differ in time. On random 4-letter text Kasai is a steady 2 to 3 times faster. On a string of one repeated letter, the naive method slows quadratically and Kasai does not, reaching <b>786 times faster at n = 3200</b>.</p>
+
+    <div class="tabs" role="group" aria-label="Input type">
+      <button id="tabR" aria-pressed="false">Random text</button>
+      <button id="tabW" aria-pressed="true">Worst case: "a" repeated</button>
+    </div>
+    <div class="chartbox"><svg class="chart" id="chart" viewBox="0 0 720 320" role="img" aria-label="Line chart of LCP construction time against input length"></svg></div>
+    <div class="tablewrap"><table class="btable" id="btable"></table></div>
+    <p class="note" style="margin-top:12px">Reported results from the Python implementation, times in seconds.</p>
+
+    <div class="live">
+      <h3>Run it on your own device</h3>
+      <p>The same two algorithms, written in JavaScript, timed in your browser right now. Your numbers will differ from the Python results above, but the gap should look familiar.</p>
+      <button class="primary" id="runLive">Run benchmark</button>
+      <div class="tablewrap"><table class="btable" id="livetable" style="display:none"></table></div>
+    </div>
+  </div>
+</section>
+
+<section id="background">
+  <div class="wrap">
+    <h2>Background and goals</h2>
+    <p>Computing the LCP array by brute force takes O(n²) time in the worst case, which is impractical for the large texts used in compression and analytics pipelines. This project builds the suffix array, implements the naive method as a correctness baseline, implements Kasai's linear-time method, and checks that the two agree.</p>
+
+    <h3 style="margin-top:34px">Research this builds on</h3>
+    <ul class="tl">
+      <li><span class="yr">1993</span><p><b>Manber and Myers</b> introduced the suffix array as a space-efficient alternative to suffix trees, buildable in O(n log n).</p></li>
+      <li><span class="yr">1994</span><p><b>Burrows and Wheeler</b> described a reversible text transform on sorted rotations, equivalent to a suffix array and the basis of bzip2-style compressors.</p></li>
+      <li><span class="yr">2000</span><p><b>Ferragina and Manzini</b> combined the BWT with suffix arrays to build FM-indexes for compressed full-text search.</p></li>
+      <li><span class="yr">2001</span><p><b>Kasai, Lee, Arimura, Arikawa and Park</b> proposed the linear-time LCP algorithm used here, based on the fact that the match length drops by at most one per step.</p></li>
+      <li><span class="yr">2003</span><p><b>Kärkkäinen and Sanders</b> presented the DC3 (skew) algorithm, building suffix arrays in O(n) time for very large texts.</p></li>
+    </ul>
+
+    <div class="two">
+      <div>
+        <h3>What was built</h3>
+        <ul>
+          <li>Suffix array construction</li>
+          <li>Naive O(n²) LCP algorithm as the baseline</li>
+          <li>Kasai's O(n) LCP algorithm, verified against the baseline</li>
+          <li>Pattern search, longest repeated substring, distinct-substring count, longest common substring</li>
+          <li>Benchmarks on random and worst-case text</li>
+        </ul>
+      </div>
+      <div>
+        <h3>What it needs to run</h3>
+        <ul>
+          <li>Any PC or laptop with a dual-core processor and 4 GB RAM (8 GB for larger benchmarks)</li>
+          <li>No GPU, since everything runs on the CPU</li>
+          <li>Python 3.10 or later, standard library only</li>
+          <li>Optional: matplotlib for benchmark charts</li>
+          <li>Windows, Linux or macOS</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3 style="margin-top:44px">Conclusion</h3>
+    <p>Kasai's algorithm computes the LCP array in O(n) and matched the O(n²) method on every test. It was up to about 786 times faster on repetitive worst-case text and 2 to 3 times faster on random text. Together the two arrays answer substring queries efficiently with modest memory, which is why they sit underneath BWT-based compressors, duplicate-content detection and genome alignment tools.</p>
+
+    <h3 style="margin-top:34px">Future scope</h3>
+    <ul style="padding-left:20px;max-width:68ch;margin:0">
+      <li style="margin-bottom:8px">Replace suffix array construction with the O(n) DC3/skew algorithm for genomic and web-scale texts.</li>
+      <li style="margin-bottom:8px">Add a suffix-tree emulation layer, such as LCP-interval trees, for richer structural queries.</li>
+      <li style="margin-bottom:8px">Use the toolkit inside a real Burrows-Wheeler compressor and measure compression ratio and speed.</li>
+      <li>Parallelise LCP construction and pattern search for multi-core or distributed processing.</li>
+    </ul>
+  </div>
+</section>
+
+<section id="team">
+  <div class="wrap">
+    <h2>Team</h2>
+    <p>Data Structures and Algorithms-3 (25CS2103E), A.Y. 2026-2027, KL University, Hyderabad.</p>
+    <div class="team">
+      <div><span>2520030596</span>Shivasai</div>
+      <div><span>2520030526</span>Tarun V</div>
+      <div><span>2520030513</span>K. Rohan</div>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">Project report submitted for partial fulfilment of grade in Data Structures and Algorithms-3 (25CS2103E).</div>
+</footer>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => s.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+
+/* ---------- core algorithms ---------- */
+function buildSA(s){
+  const n = s.length, sa = Array.from({length:n}, (_, i) => i);
+  sa.sort((a, b) => {
+    let i = a, j = b;
+    while (i < n && j < n && s[i] === s[j]) { i++; j++; }
+    if (i === n) return j === n ? 0 : -1;
+    if (j === n) return 1;
+    return s[i] < s[j] ? -1 : 1;
+  });
+  return sa;
+}
+function naiveLCP(s, sa){
+  const n = s.length, lcp = new Array(n).fill(0); let cmp = 0;
+  for (let k = 1; k < n; k++){
+    const a = sa[k-1], b = sa[k]; let h = 0;
+    while (a + h < n && b + h < n){ cmp++; if (s[a+h] !== s[b+h]) break; h++; }
+    lcp[k] = h;
+  }
+  return {lcp, cmp};
+}
+function kasaiLCP(s, sa){
+  const n = s.length, rank = new Array(n), lcp = new Array(n).fill(0); let cmp = 0, h = 0;
+  for (let k = 0; k < n; k++) rank[sa[k]] = k;
+  for (let i = 0; i < n; i++){
+    const r = rank[i];
+    if (r > 0){
+      const j = sa[r-1];
+      while (i + h < n && j + h < n){ cmp++; if (s[i+h] !== s[j+h]) break; h++; }
+      lcp[r] = h;
+      if (h > 0) h--;
+    } else h = 0;
+  }
+  return {lcp, cmp};
+}
+function kasaiSteps(s, sa){
+  const n = s.length, rank = new Array(n), snap = new Array(n).fill(null);
+  for (let k = 0; k < n; k++) rank[sa[k]] = k;
+  snap[0] = 0;
+  const steps = []; let h = 0, cmp = 0;
+  for (let i = 0; i < n; i++){
+    const r = rank[i];
+    if (r > 0){
+      const j = sa[r-1], hStart = h;
+      while (i + h < n && j + h < n){ cmp++; if (s[i+h] !== s[j+h]) break; h++; }
+      snap[r] = h;
+      steps.push({i, r, j, hStart, hEnd: h, cmp, snap: snap.slice()});
+      if (h > 0) h--;
+    } else {
+      h = 0;
+      steps.push({i, r, j: -1, hStart: 0, hEnd: 0, cmp, snap: snap.slice()});
+    }
+  }
+  return steps;
+}
+
+/* ---------- queries ---------- */
+function searchSA(s, sa, p){
+  const n = s.length, m = p.length;
+  if (!m) return {start:0, end:0, pos:[]};
+  let lo = 0, hi = n;
+  while (lo < hi){ const mid = (lo + hi) >> 1; if (s.substr(sa[mid], m) < p) lo = mid + 1; else hi = mid; }
+  const start = lo; hi = n;
+  while (lo < hi){ const mid = (lo + hi) >> 1; if (s.substr(sa[mid], m) <= p) lo = mid + 1; else hi = mid; }
+  return {start, end: lo, pos: sa.slice(start, lo).sort((a, b) => a - b)};
+}
+function longestRepeated(s, sa, lcp){
+  let best = 0, at = -1;
+  for (let k = 1; k < lcp.length; k++) if (lcp[k] > best){ best = lcp[k]; at = k; }
+  if (best === 0) return null;
+  const a = sa[at-1], b = sa[at];
+  return {len: best, str: s.substr(sa[at], best), a: Math.min(a, b), b: Math.max(a, b)};
+}
+function distinctCount(n, lcp){ return n*(n+1)/2 - lcp.reduce((x, y) => x + y, 0); }
+function longestCommon(a, b){
+  if (!a.length || !b.length) return null;
+  const s = a + '\u0001' + b + '\u0002', sa = buildSA(s), {lcp} = kasaiLCP(s, sa), la = a.length;
+  let best = 0, at = -1;
+  for (let k = 1; k < sa.length; k++){
+    const x = sa[k-1] < la, y = sa[k] < la;
+    const xb = sa[k-1] > la, yb = sa[k] > la;
+    if (((x && yb) || (xb && y)) && lcp[k] > best){ best = lcp[k]; at = k; }
+  }
+  return best ? s.substr(sa[at], best) : null;
+}
+
+/* ---------- hero ---------- */
+let T = 'banana', SA = [], LCP = [], steps = [], sidx = 0, timer = null;
+
+function renderHero(){
+  const n = T.length;
+  const tbl = $('#satable');
+  if (!n){
+    tbl.innerHTML = '<tr><td style="padding:18px;font-family:var(--body);color:var(--muted)">Type at least one character to build the arrays.</td></tr>';
+    $('#arrays').innerHTML = ''; $('#cmpbox').innerHTML = ''; return;
+  }
+  SA = buildSA(T);
+  const nv = naiveLCP(T, SA), kv = kasaiLCP(T, SA);
+  LCP = kv.lcp;
+  let html = '<tr><th>k</th><th>SA[k]</th><th>LCP[k]</th><th>Suffix</th></tr>';
+  for (let k = 0; k < n; k++){
+    const suf = T.slice(SA[k]), l = LCP[k];
+    html += `<tr><td class="n">${k}</td><td class="v">${SA[k]}</td><td class="lcpv">${l}</td><td class="suf">` +
+      (l ? `<mark class="m">${esc(suf.slice(0, l))}</mark>` : '') + esc(suf.slice(l)) + '</td></tr>';
+  }
+  tbl.innerHTML = html;
+  $('#arrays').innerHTML =
+    `<div><span class="k">SA</span>[${SA.join(', ')}]</div><div><span class="k">LCP</span>[${LCP.join(', ')}]</div>`;
+  const same = JSON.stringify(nv.lcp) === JSON.stringify(kv.lcp);
+  $('#cmpbox').innerHTML = `<p>The naive method made <b class="mono">${nv.cmp}</b> character comparisons. Kasai's made <b class="mono">${kv.cmp}</b>. ` +
+    `Both produced ${same ? '<b style="color:var(--good)">identical</b>' : '<b>different</b>'} LCP arrays for this text.</p>`;
+
+  steps = kasaiSteps(T, SA); sidx = 0; stopPlay(); renderStep();
+}
+
+/* ---------- stepper ---------- */
+function chars(str, hs, he, mismatch){
+  let o = '';
+  for (let c = 0; c < str.length; c++){
+    let cls = 'ch';
+    if (c < hs) cls += ' skip'; else if (c < he) cls += ' hit'; else if (c === he && mismatch) cls += ' miss';
+    o += `<span class="${cls}">${esc(str[c])}</span>`;
+  }
+  return o;
+}
+function renderCells(el, arr, cur){
+  el.innerHTML = arr.map((v, k) =>
+    `<div class="cell${k === cur ? ' cur' : ''}"><div class="i">${k}</div><div class="x${v === null ? ' empty' : ''}">${v === null ? '·' : v}</div></div>`).join('');
+}
+function renderStep(){
+  const n = T.length;
+  if (!n){ ['#pair','#stepmsg','#cellsSA','#cellsLCP','#stepcmp','#steppos'].forEach(q => $(q).innerHTML = ''); return; }
+  const st = steps[sidx];
+  const sufI = T.slice(st.i);
+  let pair, msg;
+  if (st.r === 0){
+    pair = `<div class="row"><span class="tag">Suffix ${st.i}</span><span class="chars">${chars(sufI, 0, 0, false)}</span></div>`;
+    msg = `Suffix ${st.i} is the smallest in sorted order, so it has no predecessor. LCP[0] stays 0, and h resets to 0.`;
+  } else {
+    const sufJ = T.slice(st.j);
+    const mismatch = st.i + st.hEnd < n && st.j + st.hEnd < n;
+    pair = `<div class="row"><span class="tag">Suffix ${st.i}</span><span class="chars">${chars(sufI, st.hStart, st.hEnd, mismatch)}</span></div>` +
+           `<div class="row"><span class="tag">Predecessor, suffix ${st.j}</span><span class="chars">${chars(sufJ, st.hStart, st.hEnd, mismatch)}</span></div>`;
+    const carried = st.hStart > 0
+      ? `The previous step left h = ${st.hStart}, so the first ${st.hStart} character${st.hStart > 1 ? 's' : ''} already match and are skipped. `
+      : `Nothing carried over, so comparison starts at the first character. `;
+    const ext = st.hEnd > st.hStart
+      ? `Comparing onward extends the match to ${st.hEnd}. `
+      : `The very next characters differ, so the match stays at ${st.hEnd}. `;
+    msg = `${carried}${ext}Store LCP[${st.r}] = ${st.hEnd}. The next step starts with h = ${Math.max(st.hEnd - 1, 0)}.`;
+  }
+  $('#pair').innerHTML = pair;
+  $('#stepmsg').textContent = msg;
+  renderCells($('#cellsSA'), SA, st.r);
+  renderCells($('#cellsLCP'), st.snap, st.r);
+  $('#stepcmp').textContent = `${st.cmp} of ${kasaiLCP(T, SA).cmp}`;
+  $('#steppos').textContent = `Step ${sidx + 1} of ${steps.length}`;
+  $('#bBack').disabled = sidx === 0;
+  $('#bNext').disabled = sidx === steps.length - 1;
+}
+function stopPlay(){ if (timer){ clearInterval(timer); timer = null; } $('#bPlay').textContent = 'Play'; }
+$('#bNext').onclick = () => { if (sidx < steps.length - 1){ sidx++; renderStep(); } };
+$('#bBack').onclick = () => { if (sidx > 0){ sidx--; renderStep(); } };
+$('#bReset').onclick = () => { stopPlay(); sidx = 0; renderStep(); };
+$('#bPlay').onclick = () => {
+  if (timer){ stopPlay(); return; }
+  if (sidx === steps.length - 1) sidx = 0;
+  $('#bPlay').textContent = 'Pause';
+  renderStep();
+  timer = setInterval(() => { if (sidx < steps.length - 1){ sidx++; renderStep(); } else stopPlay(); }, 1100);
+};
+$('#txt').addEventListener('input', e => { T = e.target.value; renderHero(); });
+
+/* ---------- queries ---------- */
+function hlText(s, ranges){
+  const f = new Array(s.length).fill(false);
+  ranges.forEach(([a, l]) => { for (let c = a; c < a + l && c < s.length; c++) f[c] = true; });
+  let o = '', open = false;
+  for (let c = 0; c < s.length; c++){
+    if (f[c] && !open){ o += '<mark>'; open = true; }
+    if (!f[c] && open){ o += '</mark>'; open = false; }
+    o += esc(s[c]);
+  }
+  return o + (open ? '</mark>' : '');
+}
+function renderQueries(){
+  const t = $('#qt').value, p = $('#qp').value, u = $('#q2').value;
+  if (!t){
+    ['#r1','#r2','#r3','#r4'].forEach(q => $(q).innerHTML = '<span class="none">Enter a text to run this query.</span>'); return;
+  }
+  const sa = buildSA(t), {lcp} = kasaiLCP(t, sa);
+
+  // pattern search
+  if (!p) $('#r1').innerHTML = '<span class="none">Enter a pattern to search for.</span>';
+  else {
+    const r = searchSA(t, sa, p);
+    $('#r1').innerHTML = r.pos.length
+      ? `<span class="big">${r.pos.length}</span> occurrence${r.pos.length > 1 ? 's' : ''} at position${r.pos.length > 1 ? 's' : ''} ${r.pos.join(', ')}<br><span class="note">Suffix array block: rows ${r.start} to ${r.end - 1}</span><div class="hltext">${hlText(t, r.pos.map(x => [x, p.length]))}</div>`
+      : `<span class="big">0</span> occurrences<div class="hltext">${esc(t)}</div>`;
+  }
+  // LRS
+  const lrs = longestRepeated(t, sa, lcp);
+  $('#r2').innerHTML = lrs
+    ? `<span class="big">${esc(lrs.str)}</span> <span class="note">length ${lrs.len}, found at positions ${lrs.a} and ${lrs.b}</span><div class="hltext">${hlText(t, [[lrs.a, lrs.len], [lrs.b, lrs.len]])}</div>`
+    : '<span class="none">No substring repeats in this text.</span>';
+  // distinct
+  const d = distinctCount(t.length, lcp);
+  $('#r3').innerHTML = `<span class="big">${d}</span> <span class="note">distinct substrings out of ${t.length*(t.length+1)/2} total (${t.length*(t.length+1)/2 - d} duplicates)</span>`;
+  // LCS
+  if (!u) $('#r4').innerHTML = '<span class="none">Enter a second text to compare against.</span>';
+  else {
+    const l = longestCommon(t, u);
+    $('#r4').innerHTML = l
+      ? `<span class="big">${esc(l)}</span> <span class="note">length ${l.length}, shared by "${esc(t)}" and "${esc(u)}"</span>`
+      : '<span class="none">The two texts share no characters.</span>';
+  }
+}
+['#qt', '#qp', '#q2'].forEach(q => $(q).addEventListener('input', renderQueries));
+
+/* ---------- benchmark (reported results) ---------- */
+const BENCH = {
+  random: {
+    cols: ['n', 'SA build (s)', 'Naive LCP (s)', 'Kasai LCP (s)', 'Speed-up'],
+    rows: [[100, .00017, .00003, .00002, '1.6x'], [500, .00096, .00028, .00013, '2.1x'], [1000, .00240, .00060, .00028, '2.2x'],
+           [2000, .00500, .00132, .00057, '2.3x'], [4000, .01212, .00298, .00117, '2.6x']],
+    n: [100, 500, 1000, 2000, 4000], naive: [.00003, .00028, .00060, .00132, .00298], kasai: [.00002, .00013, .00028, .00057, .00117]
+  },
+  worst: {
+    cols: ['n', 'Naive LCP (s)', 'Kasai LCP (s)', 'Speed-up'],
+    rows: [[200, .00145, .00003, '47.6x'], [800, .03609, .00017, '215.0x'], [1600, .15313, .00039, '389.1x'], [3200, .61765, .00079, '786.0x']],
+    n: [200, 800, 1600, 3200], naive: [.00145, .03609, .15313, .61765], kasai: [.00003, .00017, .00039, .00079]
+  }
+};
+let mode = 'worst';
+function niceMax(v){
+  const e = Math.pow(10, Math.floor(Math.log10(v))), m = v / e;
+  return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 5 ? 5 : 10) * e;
+}
+function drawChart(){
+  const D = BENCH[mode], W = 720, H = 320, L = 64, R = 74, Tp = 18, B = 46;
+  const xs = D.n, xmax = xs[xs.length-1];
+  const ymax = niceMax(Math.max(...D.naive));
+  const X = v => L + (v / xmax) * (W - L - R), Y = v => H - B - (v / ymax) * (H - B - Tp);
+  const fmt = v => v >= 0.1 ? v.toFixed(1) : v >= 0.01 ? v.toFixed(2) : v.toFixed(3);
+  let s = '';
+  for (let g = 0; g <= 4; g++){
+    const v = ymax * g / 4, y = Y(v);
+    s += `<line class="gl" x1="${L}" x2="${W-R}" y1="${y}" y2="${y}"/><text x="${L-8}" y="${y+4}" text-anchor="end">${fmt(v)}</text>`;
+  }
+  xs.forEach(v => { s += `<text x="${X(v)}" y="${H-B+18}" text-anchor="middle">${v}</text>`; });
+  s += `<line class="ax" x1="${L}" x2="${W-R}" y1="${H-B}" y2="${H-B}"/><line class="ax" x1="${L}" x2="${L}" y1="${Tp}" y2="${H-B}"/>`;
+  s += `<text x="${(L+W-R)/2}" y="${H-6}" text-anchor="middle">Input length n</text>`;
+  s += `<text x="14" y="${(Tp+H-B)/2}" text-anchor="middle" transform="rotate(-90 14 ${(Tp+H-B)/2})">Time (seconds)</text>`;
+  const line = (arr, col, cls, label) => {
+    const pts = xs.map((v, i) => `${X(v)},${Y(arr[i])}`).join(' ');
+    let o = `<polyline points="${pts}" fill="none" stroke="${col}" stroke-width="2.5" stroke-linejoin="round"/>`;
+    xs.forEach((v, i) => { o += `<circle cx="${X(v)}" cy="${Y(arr[i])}" r="4" fill="${col}"><title>n=${v}: ${arr[i]} s</title></circle>`; });
+    const lx = X(xs[xs.length-1]) + 8, ly = Y(arr[arr.length-1]) + (cls === 'lab-k' ? -6 : 4);
+    return o + `<text class="${cls}" x="${lx}" y="${ly}">${label}</text>`;
+  };
+  s += line(D.naive, 'var(--accent)', 'lab-n', 'Naive');
+  s += line(D.kasai, 'var(--ink)', 'lab-k', 'Kasai');
+  $('#chart').innerHTML = s;
+  $('#btable').innerHTML = '<tr>' + D.cols.map(c => `<th>${c}</th>`).join('') + '</tr>' +
+    D.rows.map(r => '<tr>' + r.map((c, i) => `<td${i === r.length - 1 ? ' class="sp"' : ''}>${c}</td>`).join('') + '</tr>').join('');
+  $('#tabR').setAttribute('aria-pressed', mode === 'random');
+  $('#tabW').setAttribute('aria-pressed', mode === 'worst');
+}
+$('#tabR').onclick = () => { mode = 'random'; drawChart(); };
+$('#tabW').onclick = () => { mode = 'worst'; drawChart(); };
+
+/* ---------- live benchmark ---------- */
+function timeit(fn){
+  let reps = 1;
+  for (;;){
+    const t0 = performance.now();
+    for (let r = 0; r < reps; r++) fn();
+    const dt = performance.now() - t0;
+    if (dt >= 25 || reps > 1e6) return dt / reps;
+    reps *= 4;
+  }
+}
+function randomText(n){ let o = ''; const a = 'ACGT'; for (let i = 0; i < n; i++) o += a[Math.floor(Math.random()*4)]; return o; }
+$('#runLive').onclick = async () => {
+  const btn = $('#runLive'), tbl = $('#livetable');
+  btn.disabled = true; btn.textContent = 'Running…';
+  tbl.style.display = 'table';
+  tbl.innerHTML = '<tr><th>Input</th><th>n</th><th>Naive (ms)</th><th>Kasai (ms)</th><th>Speed-up</th></tr>';
+  const jobs = [];
+  [250, 500, 1000, 2000].forEach(n => jobs.push(['Random 4-letter', n, randomText(n)]));
+  [250, 500, 1000, 2000].forEach(n => jobs.push(['"a" repeated', n, 'a'.repeat(n)]));
+  for (const [label, n, s] of jobs){
+    await new Promise(r => setTimeout(r, 30));
+    const sa = buildSA(s);
+    const tn = timeit(() => naiveLCP(s, sa)), tk = timeit(() => kasaiLCP(s, sa));
+    const ok = JSON.stringify(naiveLCP(s, sa).lcp) === JSON.stringify(kasaiLCP(s, sa).lcp);
+    tbl.insertAdjacentHTML('beforeend',
+      `<tr><td>${label}${ok ? '' : ' (MISMATCH)'}</td><td>${n}</td><td>${tn.toFixed(3)}</td><td>${tk.toFixed(3)}</td><td class="sp">${(tn / tk).toFixed(1)}x</td></tr>`);
+  }
+  btn.disabled = false; btn.textContent = 'Run again';
+};
+
+/* ---------- init ---------- */
+renderHero(); renderQueries(); drawChart();
+</script>
+</body>
+</html>
